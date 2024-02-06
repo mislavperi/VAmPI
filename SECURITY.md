@@ -42,6 +42,8 @@ def remove_server_header(app):
 
 Site is served only through localhost and through HTTP, we should enable encryption and provide a HTTPS certificate (for example, use Let's encrypt certificates through Certbot or similar)
 
+![alt text](image-5.png)
+
 ## Module 2
 
 Using SonarQube we revealed a few possible issues
