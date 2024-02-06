@@ -55,15 +55,12 @@ Replacing it with `'^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'` should eliminat
 - Possible unsecure random number generator
 Using `randomint = str(randrange(100))`could be insecure, so we are going to enhance it by using cryptographically secure random number generator `randomint = str(secrets.randbelow(1000))`
 ![alt text](image-1.png)
-- Python image runs as root user, possibly exposing vulnerbilities through it. We need to create a new user to not run commands as root
-
+- Python image runs as root user, possibly exposing vulnerbilities through it. We need to create a new user to not run commands as root. ![alt text](image-2.png) 
 ```dockerfile
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 ...
 USER appuser
 ```
-
-![alt text](image-2.png)
 
 End result:
 
