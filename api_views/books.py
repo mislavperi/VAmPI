@@ -2,11 +2,10 @@ import jsonschema
 
 from api_views.users import token_validator
 from config import db
-from api_views.json_schemas import *
+from api_views.json_schemas import add_book_schema
 from flask import jsonify, Response, request, json
 from models.user_model import User
 from models.books_model import Book
-from app import vuln
 
 
 def error_message_helper(msg):
