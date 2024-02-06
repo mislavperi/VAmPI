@@ -5,6 +5,7 @@ from config import db
 from api_views.json_schemas import register_user_schema, login_user_schema, update_email_schema
 from flask import jsonify, Response, request, json
 from models.user_model import User
+import bcrypt
 
 APPLICATION_JSON="application/json"
 
@@ -35,17 +36,9 @@ def register_user():
     user = User.query.filter_by(username=request_data.get('username')).first()
     if not user:
         try:
-            # validate the data are in the correct form
             jsonschema.validate(request_data, register_user_schema)
-            if 'admin' in request_data:  # User is possible to define if she/he wants to be an admin !!
-                if request_data['admin']:
-                    admin = True
-                else:
-                    admin = False
-                user = User(username=request_data['username'], password=request_data['password'],
-                            email=request_data['email'], admin=admin)
-            else:
-                user = User(username=request_data['username'], password=request_data['password'],
+            hashed_pswd = bcrypt.hashpw(request_data['password'], bcrypt.gensalt())
+            user = User(username=request_data['username'], password=hashed_pswd,
                             email=request_data['email'])
             db.session.add(user)
             db.session.commit()
@@ -64,29 +57,39 @@ def register_user():
 
 def login_user():
     request_data = request.get_json()
-
     try:
-        # validate the data are in the correct form
         jsonschema.validate(request_data, login_user_schema)
-        # fetching user data if the user exists
         user = User.query.filter_by(username=request_data.get('username')).first()
-        if user and request_data.get('password') == user.password:
+        if user and bcrypt.checkpw(request_data.get('password')) == user.password:
             auth_token = user.encode_auth_token(user.username)
+            refresh_token = user.encode_refresh_token(user.username)
             responseObject = {
                 'status': 'success',
                 'message': 'Successfully logged in.',
-                'auth_token': auth_token
+                'auth_token': auth_token,
+                'refresh_token': refresh_token
             }
             return Response(json.dumps(responseObject), 200, mimetype=APPLICATION_JSON)
-        if user and request_data.get('password') != user.password:
-            return Response(error_message_helper("Password is not correct for the given username."), 200, mimetype=APPLICATION_JSON)
-        elif not user:  # User enumeration
-            return Response(error_message_helper("Username does not exist"), 200, mimetype=APPLICATION_JSON)
+        if (user and request_data.get('password') != user.password) or (not user):
+            return Response(error_message_helper("Username or Password Incorrect!"), 200, mimetype="application/json")
     except jsonschema.exceptions.ValidationError as exc:
         return Response(error_message_helper(exc.message), 400, mimetype=APPLICATION_JSON)
     except:
         return Response(error_message_helper("An error occurred!"), 200, mimetype=APPLICATION_JSON)
 
+def refresh_access_token(refresh_token):
+    if refresh_token:
+        try:
+            refresh_token = refresh_token.split(" ")[1]
+        except:
+            refresh_token = ""
+    else:
+        refresh_token = ""
+    if refresh_token:
+        # if auth_token is valid we get back the username of the user
+        return User.decode_refresh_token(refresh_token)
+    else:
+        return "Invalid token"
 
 def token_validator(auth_header):
     if auth_header:
@@ -109,7 +112,7 @@ def update_email(username):
         jsonschema.validate(request_data, update_email_schema)
     except:
         return Response(error_message_helper("Please provide a proper JSON body."), 400, mimetype=APPLICATION_JSON)
-    resp = token_validator(request.headers.get('Authorization'))
+    resp = token_validator(request.headers.get('Authorization'), request.headers.get('Refresh'))
     if "expired" in resp:
         return Response(error_message_helper(resp), 401, mimetype=APPLICATION_JSON)
     elif "Invalid token" in resp:
@@ -136,7 +139,7 @@ def update_email(username):
 
 def update_password(username):
     request_data = request.get_json()
-    resp = token_validator(request.headers.get('Authorization'))
+    resp = token_validator(request.headers.get('Authorization'), request.headers.get('Refresh'))
     if "expired" in resp:
         return Response(error_message_helper(resp), 401, mimetype=APPLICATION_JSON)
     elif "Invalid token" in resp:
@@ -156,7 +159,7 @@ def update_password(username):
 
 
 def delete_user(username):
-    resp = token_validator(request.headers.get('Authorization'))
+    resp = token_validator(request.headers.get('Authorization'), request.headers.get('Refresh'))
     if "expired" in resp:
         return Response(error_message_helper(resp), 401, mimetype=APPLICATION_JSON)
     elif "Invalid token" in resp:

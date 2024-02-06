@@ -31,7 +31,24 @@ class User(db.Model):
             payload = {
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=0, seconds=alive),
                 'iat': datetime.datetime.utcnow(),
-                'sub': user_id
+                'sub': user_id,
+                'type': 'access'
+            }
+            return jwt.encode(
+                payload,
+                vuln_app.app.config.get('SECRET_KEY'),
+                algorithm='HS256'
+            )
+        except Exception as e:
+            return e
+        
+    def encode_refresh_token(self, user_id):
+        try:
+            payload = {
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=2, seconds=alive),
+                'iat': datetime.datetime.utcnow(),
+                'sub': user_id,
+                'type': 'refresh'
             }
             return jwt.encode(
                 payload,
@@ -47,7 +64,28 @@ class User(db.Model):
             payload = jwt.decode(auth_token, vuln_app.app.config.get('SECRET_KEY'), algorithms=["HS256"])
             return payload['sub']
         except jwt.ExpiredSignatureError:
-            return 'Signature expired. Please log in again.'
+            return jwt.ExpiredSignatureError
+        except jwt.InvalidTokenError:
+            return 'Invalid token. Please log in again.'
+        
+    @staticmethod    
+    def decode_refresh_token(refresh_token):
+        try:
+            info = jwt.decode(refresh_token, vuln_app.app.config.get('SECRET_KEY'), algorithms=["HS256"])
+            payload = {
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=0, seconds=alive),
+                'iat': datetime.datetime.utcnow(),
+                'sub': info['sub'],
+                'type': 'access'
+            }
+            return jwt.encode(
+                payload,
+                vuln_app.app.config.get('SECRET_KEY'),
+                algorithm='HS256'
+            )
+
+        except jwt.ExpiredSignatureError:
+            return jwt.ExpiredSignatureError
         except jwt.InvalidTokenError:
             return 'Invalid token. Please log in again.'
 
